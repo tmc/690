@@ -45,12 +45,13 @@ func main() {
 	}
 	c.SetDictionary(f)
 
-	candidates, err := c.CrackVigenere(*ciphertext, *keyLength, *firstWordLength)
+	results, err := c.CrackVigenere(*ciphertext, *keyLength, *firstWordLength)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
-	for candidate := range candidates {
-		fmt.Println(candidate)
+	for result := range results {
+		fmt.Println("Key:  ", result.Key)
+		fmt.Println("Plain:", result.Plaintext)
 	}
 
 	if *memprofile != "" {
