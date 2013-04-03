@@ -47,8 +47,8 @@ func (c *cracker) CrackVigenere(ciphertext string, keyLength, firstWordLength in
 
 	firstWordCiphered := ciphertext[:firstWordLength]
 
-	N := 2
-	runtime.GOMAXPROCS(2)
+	N := 1
+	runtime.GOMAXPROCS(1)
 	keys := keyGenerator(keyLength, 'A', 'Z')
 
 	var wg sync.WaitGroup
@@ -83,41 +83,27 @@ func (c *cracker) checkKeys(keys chan string, firstWord, ciphertext string, wg *
 	wg.Done()
 }
 
-func bkeyGenerator(keyLength int, start, end byte) chan []byte {
-	result := make(chan []byte)
+func keyGenerator(length int, min, max byte) chan string {
+	out := make(chan string)
 	go func() {
-		if keyLength == 1 {
-			for char := start; char <= end; char++ {
-				result <- []byte{char}
+		current := make([]byte, length)
+		for {
+			for i := len(current) - 1; i >= 0; i-- {
+				if current[i] < min {
+					current[i] = min
+				} else if current[i] == max {
+					if i == 0 {
+						close(out)
+						return
+					}
+					current[i] = min
+				} else {
+					current[i]++
+					break
+				}
 			}
-			close(result)
-			return
-		}
-		for char := start; char <= end; char++ {
-			for rest := range keyGenerator(keyLength-1, start, end) {
-				result <- append([]byte{char}, rest...)
-			}
-		}
-		close(result)
-	}()
-	return result
-}
-
-func keyGenerator(keyLength int, start, end byte) chan string {
-	result := make(chan string)
-	go func() {
-		defer close(result)
-		if keyLength == 1 {
-			for char := start; char <= end; char++ {
-				result <- string(char)
-			}
-			return
-		}
-		for char := start; char <= end; char++ {
-			for rest := range keyGenerator(keyLength-1, start, end) {
-				result <- string(char) + rest
-			}
+			out <- string(current)
 		}
 	}()
-	return result
+	return out
 }
