@@ -15,7 +15,7 @@ var (
 	dictionary      = flag.String("dict", "", "path to newline-separated dictionary file")
 	keyLength       = flag.Int("keyLength", 0, "length of the key")
 	firstWordLength = flag.Int("firstWordLength", 0, "length of the first word")
-	definite        = flag.Bool("definite", false, "look for a definite match (all words matching)")
+	bruteForce      = flag.Bool("bruteForce", true, "brute force? (will attempt more intelligent cracking otherwise)")
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
@@ -45,7 +45,12 @@ func main() {
 	}
 	c.SetDictionary(f)
 
-	results, err := c.CrackVigenere(*ciphertext, *keyLength, *firstWordLength)
+	var results chan cracker.Result
+	if *bruteForce {
+		results, err = c.CrackVigenereBruteForce(*ciphertext, *keyLength, *firstWordLength)
+	} else {
+		results, err = c.CrackVigenereUsingTrie(*ciphertext, *keyLength, *firstWordLength)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
