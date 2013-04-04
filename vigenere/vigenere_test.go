@@ -13,7 +13,7 @@ var (
 func TestVigenere(t *testing.T) {
 
 	k := vigenere.CleanString(testKey)
-	p := testPT
+	p := vigenere.CleanString(testPT)
 
 	ct := vigenere.Encrypt(p, k)
 	pt := vigenere.Decrypt(ct, k)
