@@ -4,16 +4,17 @@ package cracker
 import (
 	"bufio"
 	"fmt"
+	"github.com/traviscline/690/trie"
 	"github.com/traviscline/690/vigenere"
 	"io"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 )
 
 type cracker struct {
-	//dictionary                 map[string]bool
-	dictionary                 *asciiTrie
+	dictionary                 *trie.Trie
 	cipherText                 string
 	keyLength, firstWordLength int
 }
@@ -27,27 +28,97 @@ func NewCracker() *cracker {
 }
 
 func (c *cracker) SetDictionary(r io.Reader) error {
-	//c.dictionary = make(map[string]bool, 0)
-	c.dictionary = NewAsciiTrie()
+	c.dictionary = trie.NewTrie()
 	br := bufio.NewReader(r)
 	var (
 		s   string
 		err error
 	)
 	for s, err = br.ReadString('\n'); err == nil; s, err = br.ReadString('\n') {
-		//c.dictionary[strings.TrimSpace(s)] = true
 		c.dictionary.Add(strings.TrimSpace(s))
 	}
 	if err != io.EOF {
 		return err
 	} else {
-		//c.dictionary[strings.TrimSpace(s)] = true
 		c.dictionary.Add(strings.TrimSpace(s))
 	}
 	return nil
 }
 
+type candidate struct {
+	key         string
+	numPrefixes int
+	numWords    int
+	plaintext   string
+}
+
+type candidateList []candidate
+
+func (cl candidateList) Len() int {
+	return len(cl)
+}
+
+func (cl candidateList) Less(i, j int) bool {
+	return cl[i].numPrefixes > cl[j].numPrefixes
+}
+
+func (cl candidateList) Swap(i, j int) {
+	cl[i], cl[j] = cl[j], cl[i]
+}
+
+type byNumWords struct {
+	candidateList
+}
+
+func (cl byNumWords) Less(i, j int) bool {
+	return cl.candidateList[i].numWords > cl.candidateList[j].numWords
+}
+
+func (cl candidateList) nextRound(judge func(s string) int) candidateList {
+	result := make(candidateList, 0, len(cl))
+	sort.Sort(cl)
+	for _, c := range cl {
+		for char := 'A'; char <= 'Z'; char++ {
+			key := c.key + string(char)
+			if n := judge(key); n > 0 {
+				result = append(result, candidate{key, n, 0, ""})
+			}
+		}
+	}
+	sort.Sort(result)
+	return result
+}
+
 func (c *cracker) CrackVigenere(ciphertext string, keyLength, firstWordLength int) (chan Result, error) {
+	results := make(chan Result)
+	if c.dictionary == nil {
+		return nil, fmt.Errorf("Dictionary not set.")
+	}
+	candidates := candidateList{candidate{"", 0, 0, ""}}
+
+	for i := 0; i < keyLength; i++ {
+		candidates = candidates.nextRound(func(s string) int {
+			p := vigenere.Decrypt(ciphertext[:len(s)], s)
+			n := c.dictionary.NumPrefixedOfLength(p, firstWordLength)
+			return n
+		})
+	}
+	go func() {
+		for _, candidate := range candidates {
+			candidate.plaintext = vigenere.Decrypt(ciphertext, candidate.key)
+			if c.dictionary.Count(candidate.plaintext[:firstWordLength]) > 0 {
+				results <- Result{
+					Key:       candidate.key,
+					Plaintext: candidate.plaintext,
+				}
+			}
+		}
+		close(results)
+	}()
+	return results, nil
+}
+
+func (c *cracker) CrackVigenereBruteForce(ciphertext string, keyLength, firstWordLength int) (chan Result, error) {
 	results := make(chan Result)
 	if c.dictionary == nil {
 		return nil, fmt.Errorf("Dictionary not set.")
@@ -113,9 +184,7 @@ func keyGenerator(start byte, length int, min, max byte) chan string {
 	go func() {
 		defer close(out)
 		current := make([]byte, length+1)
-		//complement := make([]byte, length+1)
 		current[0] = start
-		//complement[0] = start
 		running := true
 		for running {
 			for i := len(current) - 1; i >= 1; i-- {
@@ -131,15 +200,7 @@ func keyGenerator(start byte, length int, min, max byte) chan string {
 					break
 				}
 			}
-			//for i := 1; i < len(current); i ++  {
-			//	complement[i] = (25 - (current[i] - 'A') + 'A')
-			//}
-			//if current[1] > ('A' + ((max-min) / 2)) {
-			//		return
-			//}
-
 			out <- string(current)
-			//out <- string(complement)
 		}
 	}()
 	return out
