@@ -1,4 +1,3 @@
-// package vigenere implements the Vigenere cipher.
 package vigenere
 
 func vigenereBytes(text, key, destination []byte, encrypt bool) {

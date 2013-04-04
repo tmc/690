@@ -1,4 +1,3 @@
-// package cracker
 package cracker
 
 import (
