@@ -1,15 +1,14 @@
 package vigenere_test
 
 import (
-	"testing"
 	vigenere "."
+	"testing"
 )
 
 var (
 	testKey string = "Lemon"
-	testPT = "Attack at Dawn"
+	testPT         = "Attack at Dawn"
 )
-
 
 func TestVigenere(t *testing.T) {
 
@@ -29,7 +28,7 @@ func BenchmarkVigenereEncrypt(b *testing.B) {
 	b.StopTimer()
 	k := vigenere.CleanString(testKey)
 	b.StartTimer()
-    for i := 0; i < b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		_ = vigenere.Encrypt("Why hello there", k)
-    }
+	}
 }
